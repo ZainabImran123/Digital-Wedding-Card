@@ -92,35 +92,27 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // Robust Intro Video Autoplay & Fallback Handling for Live Environments
+  // Force Autoplay on Load
   useEffect(() => {
     const videoEl = introVideoRef.current;
     if (!videoEl) return;
 
     videoEl.muted = true;
-    const playPromise = videoEl.play();
-
-    if (playPromise !== undefined) {
-      playPromise.catch((err) => {
-        console.log("Browser restricted video autoplay, waiting for interaction:", err);
-      });
-    }
-
-    // Tap/Click anywhere on the black screen if autoplay is locked by the browser
-    const handleVideoKickstart = () => {
-      if (videoEl.paused) {
-        videoEl.play().catch(e => console.log(e));
-      }
-    };
-
-    window.addEventListener("click", handleVideoKickstart);
-    window.addEventListener("touchstart", handleVideoKickstart);
-
-    return () => {
-      window.removeEventListener("click", handleVideoKickstart);
-      window.removeEventListener("touchstart", handleVideoKickstart);
-    };
+    videoEl.play().catch((err) => {
+      console.log("Autoplay restricted, awaiting user tap:", err);
+    });
   }, []);
+
+  const handleForcePlayVideo = () => {
+    const videoEl = introVideoRef.current;
+    if (!videoEl) return;
+    videoEl.muted = true;
+    videoEl.play().then(() => {
+      // Hide fallback touch layer if needed
+    }).catch(err => {
+      console.log("Playback error:", err);
+    });
+  };
 
   // GSAP scroll animations after entering site
   useEffect(() => {
@@ -186,7 +178,7 @@ export default function App() {
         Your browser does not support the audio element.
       </audio>
 
-      {/* --- MINIMAL BACKGROUNDLESS AUDIO TOGGLE BUTTON --- */}
+      {/* --- MINIMAL AUDIO TOGGLE BUTTON --- */}
       <button
         onClick={toggleMusic}
         className="fixed top-4 right-4 z-50 bg-transparent text-[#3a332a] hover:text-[#d4af37] p-2 transition-all flex items-center gap-1.5 focus:outline-none cursor-pointer"
@@ -236,26 +228,30 @@ export default function App() {
         .animate-gentle-float { animation: gentleFloat 3s ease-in-out infinite; }
       `}</style>
 
-      {/* --- FULLSCREEN INTRO VIDEO SCREEN --- */}
+      {/* --- FULLSCREEN INTRO VIDEO SCREEN WITH GUARANTEED TOUCH OVERLAY --- */}
       {!showInvitation && (
-        <div className={`fixed inset-0 z-40 bg-black flex items-center justify-center transition-opacity duration-700 ${transitioning ? 'animate-zoom-out' : 'opacity-100'}`}>
+        <div
+          className={`fixed inset-0 z-40 bg-black flex items-center justify-center transition-opacity duration-700 ${transitioning ? 'animate-zoom-out' : 'opacity-100'}`}
+          onClick={handleForcePlayVideo}
+          onTouchStart={handleForcePlayVideo}
+        >
           <video
             ref={introVideoRef}
-            className="w-full h-full object-cover absolute inset-0 cursor-pointer"
+            className="w-full h-full object-cover absolute inset-0 pointer-events-none"
             autoPlay
             muted
             playsInline
             preload="auto"
             onEnded={openInvitation}
-            onClick={() => {
-              if (introVideoRef.current) {
-                introVideoRef.current.play().catch(e => console.log(e));
-              }
-            }}
           >
             <source src="/videos/my-video.mp4" type="video/mp4" />
             Your browser does not support the video tag.
           </video>
+
+          {/* Subtle tap prompt text in case the browser locks autoplay entirely */}
+          <div className="absolute bottom-10 z-50 text-white/50 text-xs font-sans-caps tracking-widest pointer-events-none animate-pulse">
+            Tap anywhere if video doesn't start
+          </div>
         </div>
       )}
 
