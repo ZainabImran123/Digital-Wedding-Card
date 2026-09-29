@@ -8,12 +8,15 @@ export default function App() {
   const [showInvitation, setShowInvitation] = useState(false);
   const [transitioning, setTransitioning] = useState(false);
   const [showBankDetails, setShowBankDetails] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   const [rsvpSubmitted, setRsvpSubmitted] = useState(false);
   const [attendanceChoice, setAttendanceChoice] = useState("Joyfully Accept");
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
 
-  // Refs for ScrollTrigger target elements
+  const introVideoRef = useRef(null);
+  const bgAudioRef = useRef(null);
+
   const detailsRef = useRef(null);
   const venueRef = useRef(null);
   const programRef = useRef(null);
@@ -22,6 +25,52 @@ export default function App() {
   const dressCodeRef = useRef(null);
   const rsvpRef = useRef(null);
   const footerRef = useRef(null);
+
+  // Try to play audio on mount and on first click/scroll anywhere
+  useEffect(() => {
+    const audioEl = bgAudioRef.current;
+    if (!audioEl) return;
+
+    audioEl.volume = 1.0;
+
+    const playAudio = () => {
+      audioEl.play().then(() => {
+        setIsPlaying(true);
+      }).catch((err) => {
+        console.log("Autoplay blocked by browser:", err);
+      });
+    };
+
+    playAudio();
+
+    const handleUserInteraction = () => {
+      playAudio();
+      window.removeEventListener("click", handleUserInteraction);
+      window.removeEventListener("scroll", handleUserInteraction);
+      window.removeEventListener("touchstart", handleUserInteraction);
+    };
+
+    window.addEventListener("click", handleUserInteraction);
+    window.addEventListener("scroll", handleUserInteraction);
+    window.addEventListener("touchstart", handleUserInteraction);
+
+    return () => {
+      window.removeEventListener("click", handleUserInteraction);
+      window.removeEventListener("scroll", handleUserInteraction);
+      window.removeEventListener("touchstart", handleUserInteraction);
+    };
+  }, []);
+
+  const toggleMusic = () => {
+    const audioEl = bgAudioRef.current;
+    if (!audioEl) return;
+    if (isPlaying) {
+      audioEl.pause();
+      setIsPlaying(false);
+    } else {
+      audioEl.play().then(() => setIsPlaying(true)).catch(e => console.log(e));
+    }
+  };
 
   useEffect(() => {
     const target = new Date("2026-10-03T16:00:00").getTime();
@@ -35,8 +84,6 @@ export default function App() {
           minutes: Math.floor((difference / 1000 / 60) % 60),
           seconds: Math.floor((difference / 1000) % 60),
         });
-      } else {
-        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
       }
     };
     updateCountdown();
@@ -44,10 +91,14 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // GSAP ScrollTrigger Animations setup once the invitation opens
+  useEffect(() => {
+    if (introVideoRef.current) {
+      introVideoRef.current.play().catch((err) => console.log(err));
+    }
+  }, []);
+
   useEffect(() => {
     if (!showInvitation) return;
-
     const sections = [
       detailsRef.current,
       venueRef.current,
@@ -58,11 +109,10 @@ export default function App() {
       rsvpRef.current,
       footerRef.current,
     ];
-
+    const triggers = [];
     sections.forEach((section) => {
       if (!section) return;
-
-      gsap.fromTo(
+      const anim = gsap.fromTo(
         section.children,
         { opacity: 0, y: 40 },
         {
@@ -78,14 +128,15 @@ export default function App() {
           },
         }
       );
+      if (anim.scrollTrigger) triggers.push(anim.scrollTrigger);
     });
-
     return () => {
+      triggers.forEach((trig) => trig.kill());
       ScrollTrigger.refresh();
     };
   }, [showInvitation]);
 
-  const handleStartClick = () => {
+  const openInvitation = () => {
     setTransitioning(true);
     setTimeout(() => {
       setShowInvitation(true);
@@ -103,19 +154,34 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#f3ede2] text-[#3a332a] font-serif relative flex flex-col items-center justify-between overflow-x-hidden selection:bg-[#d4af37]/30">
 
+      {/* --- BACKGROUND AUDIO ELEMENT --- */}
+      <audio ref={bgAudioRef} loop preload="auto">
+        <source src="/audio/wedding-song.mp3" type="audio/mp3" />
+        Your browser does not support the audio element.
+      </audio>
+
+      {/* --- LAPTOP-STYLE MINIMAL BACKGROUNDLESS AUDIO TOGGLE BUTTON --- */}
+      <button
+        onClick={toggleMusic}
+        className="fixed top-4 right-4 z-50 bg-transparent text-[#3a332a] hover:text-[#d4af37] p-2 transition-all flex items-center gap-1.5 focus:outline-none cursor-pointer"
+        title={isPlaying ? "Mute Music" : "Play Music"}
+      >
+        <span className="text-xl">{isPlaying ? "🔊" : "🔇"}</span>
+        <span className="text-xs uppercase font-sans-caps tracking-widest hidden sm:inline">
+          {isPlaying ? "Sound On" : "Sound Off"}
+        </span>
+      </button>
+
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,400&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Montserrat:wght@300;400;500&display=swap');
-
         .font-heading { font-family: 'Playfair Display', serif; }
         .font-body { font-family: 'Cormorant Garamond', serif; }
         .font-sans-caps { font-family: 'Montserrat', sans-serif; letter-spacing: 0.25em; }
-
         @keyframes zoomInSmooth {
           0% { transform: scale(1); opacity: 1; }
           100% { transform: scale(1.12); opacity: 0; filter: blur(4px); }
         }
         .animate-zoom-out { animation: zoomInSmooth 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
-
         @keyframes fadeInDown {
           0% { opacity: 0; transform: translateY(-30px); filter: blur(6px); }
           100% { opacity: 1; transform: translateY(0); filter: blur(0px); }
@@ -128,58 +194,38 @@ export default function App() {
           0% { transform: scaleX(0); opacity: 0; }
           100% { transform: scaleX(1); opacity: 0.8; }
         }
-
         @keyframes horizScrollOneWay {
           0% { transform: translateX(-100vw); }
           100% { transform: translateX(100vw); }
         }
         .animate-horizontal-move { animation: horizScrollOneWay 14s linear infinite; }
-
         .animate-subtitle { animation: fadeInDown 1.2s cubic-bezier(0.16, 1, 0.3, 1) 0.3s forwards; opacity: 0; }
         .animate-names { animation: fadeInUp 1.4s cubic-bezier(0.16, 1, 0.3, 1) 0.6s forwards; opacity: 0; }
         .animate-divider { animation: scaleInLine 1s cubic-bezier(0.16, 1, 0.3, 1) 0.9s forwards; transform-origin: center; opacity: 0; }
         .animate-date { animation: fadeInUp 1.4s cubic-bezier(0.16, 1, 0.3, 1) 1.1s forwards; opacity: 0; }
+        @keyframes gentleFloat {
+          0%, 100% { transform: translateY(0px) scale(1); }
+          50% { transform: translateY(-6px) scale(1.03); }
+        }
+        .animate-gentle-float { animation: gentleFloat 3s ease-in-out infinite; }
       `}</style>
 
-
-      {/* --- INTRO SCREEN WITH BACKGROUND VIDEO --- */}
-      {!showInvitation ? (
-        <div className={`fixed inset-0 z-50 bg-[#1c1917] flex flex-col items-center justify-center p-6 transition-opacity duration-700 ${transitioning ? 'animate-zoom-out' : 'opacity-100'}`}>
-
-          {/* Background Video Element */}
+      {/* --- FULLSCREEN INTRO VIDEO SCREEN --- */}
+      {!showInvitation && (
+        <div className={`fixed inset-0 z-40 bg-black flex items-center justify-center transition-opacity duration-700 ${transitioning ? 'animate-zoom-out' : 'opacity-100'}`}>
           <video
+            ref={introVideoRef}
+            className="w-full h-full object-cover absolute inset-0"
             autoPlay
-            loop
             muted
             playsInline
-            className="absolute inset-0 w-full h-full object-cover z-0 filter brightness-[0.4]"
+            onEnded={openInvitation}
           >
-            <source src="/__l5e/assets-v1/0d0402ff-e9c2-4a8f-8d08-7f22d985a2f1/royal-majesty.mp4" type="video/mp4" />
+            <source src="/videos/my-video.mp4" type="video/mp4" />
             Your browser does not support the video tag.
           </video>
-
-          {/* Dark Overlay for readability */}
-          <div className="absolute inset-0 bg-black/40 z-0"></div>
-
-          {/* Clickable Card Content */}
-          <div
-            onClick={handleStartClick}
-            className="relative z-10 w-full h-full bg-black/30 backdrop-blur-sm flex flex-col items-center justify-center cursor-pointer text-center p-6 space-y-8 shadow-2xl overflow-hidden rounded-3xl border border-[#d4af37]/30 max-w-2xl mx-auto my-auto"
-          >
-            <div className="absolute w-72 h-72 bg-[#d4af37]/10 rounded-full blur-3xl pointer-events-none"></div>
-
-            <div className="relative z-10 w-24 h-24 rounded-full bg-gradient-to-br from-[#d4af37] to-[#aa8225] text-white flex items-center justify-center text-3xl shadow-2xl animate-pulse border-2 border-[#fdfbf7]/40">
-              <span className="ml-1">▶</span>
-            </div>
-            <div className="relative z-10 space-y-3 max-w-md">
-              <p className="text-xs uppercase font-sans-caps text-[#d4af37] font-semibold drop-shadow">Digital Invitation</p>
-              <h1 className="text-5xl sm:text-7xl font-heading text-[#fcfaf7] font-normal tracking-wide drop-shadow-md">Clara & Nour</h1>
-              <p className="text-sm font-body text-[#d4af37] italic tracking-widest text-xl pt-1 drop-shadow">Tap anywhere to open invitation card</p>
-            </div>
-          </div>
         </div>
-      ) : null}
-
+      )}
 
       {/* --- MAIN PAGE CONTAINER --- */}
       <div className={`w-full flex-1 flex flex-col items-center relative z-10 transition-all duration-700 ${showInvitation ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
@@ -191,7 +237,7 @@ export default function App() {
             alt="Background"
             className="absolute inset-0 w-full h-full object-cover z-0"
           />
-          <div className="absolute inset-0 bg-black/15 z-0"></div>
+          <div className="absolute inset-0 bg-black/20 z-0"></div>
 
           <div className="relative z-10 space-y-4 max-w-2xl mx-auto my-auto">
             <p className="animate-subtitle text-xs sm:text-sm uppercase font-sans-caps text-[#eee4cc] tracking-[0.35em] font-semibold drop-shadow-md">
@@ -207,25 +253,20 @@ export default function App() {
           </div>
         </div>
 
-
         {/* --- COUNTDOWN SECTION --- */}
         <div ref={detailsRef} className="relative w-full min-h-[70vh] flex flex-col items-center justify-between text-center py-20 px-4 overflow-hidden bg-[#f4efe8]">
-          {/* Background Image Element */}
-          <img
-            src="https://img.magnific.com/premium-photo/surreal-style-swing-gate-with-floral-wreath-design-featuring-single-leaf-creative-idea-design_1020495-39196.jpg?semt=ais_hybrid&w=740&q=80"
-            alt="Countdown Background"
-            className="absolute inset-0 w-full h-full object-cover object-bottom z-0 opacity-85"
-          />
-
           <div className="relative z-10 space-y-2 pt-6">
             <p className="text-xl sm:text-2xl font-body italic text-[#8c7b6c] tracking-wider drop-shadow-sm">Only</p>
             <h3 className="text-7xl sm:text-9xl font-heading text-[#5c4a3d] font-bold tracking-tight drop-shadow-md">{timeLeft.days}</h3>
             <p className="text-xs sm:text-sm uppercase font-sans-caps text-[#b39679] tracking-[0.4em] font-semibold pt-1">Days to Go</p>
           </div>
 
-          <div className="relative z-10 mb-4">
-            <div className="w-12 h-12 rounded-full border border-[#b39679]/40 flex items-center justify-center text-[#8c7b6c] animate-bounce mx-auto">↓</div>
+          <div className="relative z-10 w-full max-w-md h-64 sm:h-80 my-8 rounded-2xl overflow-hidden shadow-md bg-black/10">
+            <video className="w-full h-full object-cover" autoPlay loop muted playsInline>
+              <source src="videos/door.mp4" type="video/mp4" />
+            </video>
           </div>
+          <div className="relative z-10 mb-4"></div>
         </div>
 
         {/* --- VENUE SECTION --- */}
@@ -234,14 +275,12 @@ export default function App() {
             <h1 className="text-4xl md:text-5xl font-medium mb-3 text-[#3F5F6C]">Details</h1>
             <p className="text-xs md:text-sm uppercase tracking-[0.3em] text-[#5D5D5D]">WHEN & WHERE</p>
           </div>
-
           <div className="relative w-full max-w-[420px] aspect-square flex items-center justify-center mb-16">
             <div className="absolute inset-[18%] rounded-[50%] overflow-hidden z-0">
               <img src="https://villa-perle.thedigitalyes.com/__l5e/assets-v1/9b2a9024-6044-4a39-b657-d8ecc85b61e9/venue-photo.png" alt="Venue" className="w-full h-full object-cover" />
             </div>
             <img src="https://villa-perle.thedigitalyes.com/__l5e/assets-v1/372a4581-5c40-4bd2-beed-5b278a11aeb5/venue-oval-frame.png" alt="Frame" className="relative z-10 w-full h-full object-contain pointer-events-none" />
           </div>
-
           <div className="text-center space-y-6 mb-12">
             <h2 className="text-3xl md:text-4xl font-medium text-[#3F5F6C]">The venue</h2>
             <div className="space-y-1">
@@ -252,7 +291,6 @@ export default function App() {
               <span className="text-base md:text-lg font-light">{eventTime}</span>
             </div>
           </div>
-
           <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="px-6 py-3.5 bg-[#545E56] hover:bg-[#434c45] text-white text-sm md:text-base font-medium rounded-full shadow-sm transition-all">
             Get directions
           </a>
@@ -287,7 +325,6 @@ export default function App() {
             <p className="text-base sm:text-xl font-semibold uppercase tracking-wider text-[#3F5F6C] pt-1">BY CAR</p>
             <p className="text-base sm:text-xl font-body italic text-[#5D5D5D] max-w-lg mx-auto">Free parking is available next to the venue for all guests</p>
           </div>
-
           <div className="w-full relative h-40 md:h-52 overflow-hidden flex items-center justify-center">
             <div className="absolute inset-y-0 flex items-center justify-center animate-horizontal-move w-full">
               <img src="https://villa-perle.thedigitalyes.com/__l5e/assets-v1/83fcc409-2aee-44f3-9baf-b06640233702/carriage.png" alt="Carriage" className="w-96 md:w-[500px] h-auto object-contain" />
@@ -332,13 +369,6 @@ export default function App() {
               <h2 className="text-4xl sm:text-5xl font-heading font-normal text-[#3F5F6C]">Dress code</h2>
               <p className="text-xs uppercase font-sans-caps tracking-[0.3em] text-[#5D5D5D]">FORMAL / BLACK TIE</p>
             </div>
-            <style>{`
-              @keyframes gentleFloat {
-                0%, 100% { transform: translateY(0px) scale(1); }
-                50% { transform: translateY(-6px) scale(1.03); }
-              }
-              .animate-gentle-float { animation: gentleFloat 3s ease-in-out infinite; }
-            `}</style>
             <div className="relative w-full max-w-[300px] h-40 sm:h-48 flex items-center justify-center overflow-hidden my-4">
               <img src="https://villa-perle.thedigitalyes.com/__l5e/assets-v1/41a63db0-8157-465d-954b-4837a9c72c27/dress-code-a.png" alt="Dress Code" className="w-full h-full object-contain animate-gentle-float" />
             </div>
@@ -389,7 +419,6 @@ export default function App() {
             )}
           </div>
         </section>
-
 
         {/* --- FOOTER SECTION --- */}
         <section ref={footerRef} className="w-full py-20 md:py-28 flex flex-col items-center justify-center px-4 bg-[#f3ede2]">
