@@ -26,7 +26,7 @@ export default function App() {
   const rsvpRef = useRef(null);
   const footerRef = useRef(null);
 
-  // Try to play audio on mount and on first click/scroll anywhere
+  // Background music setup & user interaction unlock
   useEffect(() => {
     const audioEl = bgAudioRef.current;
     if (!audioEl) return;
@@ -72,6 +72,7 @@ export default function App() {
     }
   };
 
+  // Countdown timer setup
   useEffect(() => {
     const target = new Date("2026-10-03T16:00:00").getTime();
     const updateCountdown = () => {
@@ -91,12 +92,37 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
+  // Robust Intro Video Autoplay & Fallback Handling for Live Environments
   useEffect(() => {
-    if (introVideoRef.current) {
-      introVideoRef.current.play().catch((err) => console.log(err));
+    const videoEl = introVideoRef.current;
+    if (!videoEl) return;
+
+    videoEl.muted = true;
+    const playPromise = videoEl.play();
+
+    if (playPromise !== undefined) {
+      playPromise.catch((err) => {
+        console.log("Browser restricted video autoplay, waiting for interaction:", err);
+      });
     }
+
+    // Tap/Click anywhere on the black screen if autoplay is locked by the browser
+    const handleVideoKickstart = () => {
+      if (videoEl.paused) {
+        videoEl.play().catch(e => console.log(e));
+      }
+    };
+
+    window.addEventListener("click", handleVideoKickstart);
+    window.addEventListener("touchstart", handleVideoKickstart);
+
+    return () => {
+      window.removeEventListener("click", handleVideoKickstart);
+      window.removeEventListener("touchstart", handleVideoKickstart);
+    };
   }, []);
 
+  // GSAP scroll animations after entering site
   useEffect(() => {
     if (!showInvitation) return;
     const sections = [
@@ -160,7 +186,7 @@ export default function App() {
         Your browser does not support the audio element.
       </audio>
 
-      {/* --- LAPTOP-STYLE MINIMAL BACKGROUNDLESS AUDIO TOGGLE BUTTON --- */}
+      {/* --- MINIMAL BACKGROUNDLESS AUDIO TOGGLE BUTTON --- */}
       <button
         onClick={toggleMusic}
         className="fixed top-4 right-4 z-50 bg-transparent text-[#3a332a] hover:text-[#d4af37] p-2 transition-all flex items-center gap-1.5 focus:outline-none cursor-pointer"
@@ -215,11 +241,17 @@ export default function App() {
         <div className={`fixed inset-0 z-40 bg-black flex items-center justify-center transition-opacity duration-700 ${transitioning ? 'animate-zoom-out' : 'opacity-100'}`}>
           <video
             ref={introVideoRef}
-            className="w-full h-full object-cover absolute inset-0"
+            className="w-full h-full object-cover absolute inset-0 cursor-pointer"
             autoPlay
             muted
             playsInline
+            preload="auto"
             onEnded={openInvitation}
+            onClick={() => {
+              if (introVideoRef.current) {
+                introVideoRef.current.play().catch(e => console.log(e));
+              }
+            }}
           >
             <source src="/videos/my-video.mp4" type="video/mp4" />
             Your browser does not support the video tag.
@@ -263,7 +295,7 @@ export default function App() {
 
           <div className="relative z-10 w-full max-w-md h-64 sm:h-80 my-8 rounded-2xl overflow-hidden shadow-md bg-black/10">
             <video className="w-full h-full object-cover" autoPlay loop muted playsInline>
-              <source src="videos/door.mp4" type="video/mp4" />
+              <source src="/videos/door.mp4" type="video/mp4" />
             </video>
           </div>
           <div className="relative z-10 mb-4"></div>
