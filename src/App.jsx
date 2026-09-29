@@ -92,7 +92,7 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // Force Autoplay on Load
+  // Force Autoplay on Load for Intro Video
   useEffect(() => {
     const videoEl = introVideoRef.current;
     if (!videoEl) return;
@@ -106,12 +106,23 @@ export default function App() {
   const handleForcePlayVideo = () => {
     const videoEl = introVideoRef.current;
     if (!videoEl) return;
-    videoEl.muted = true;
-    videoEl.play().then(() => {
-      // Hide fallback touch layer if needed
-    }).catch(err => {
-      console.log("Playback error:", err);
-    });
+
+    if (videoEl.paused) {
+      videoEl.muted = true;
+      videoEl.play().then(() => {
+        // Playback successfully resumed
+      }).catch(err => {
+        console.log("Playback retry error:", err);
+      });
+    }
+  };
+
+  const openInvitation = () => {
+    setTransitioning(true);
+    setTimeout(() => {
+      setShowInvitation(true);
+      setTransitioning(false);
+    }, 800);
   };
 
   // GSAP scroll animations after entering site
@@ -153,14 +164,6 @@ export default function App() {
       ScrollTrigger.refresh();
     };
   }, [showInvitation]);
-
-  const openInvitation = () => {
-    setTransitioning(true);
-    setTimeout(() => {
-      setShowInvitation(true);
-      setTransitioning(false);
-    }, 800);
-  };
 
   const venueName = "MAIRIE DE VAURÉAL";
   const venueAddress = "Vauréal, France";
@@ -243,11 +246,11 @@ export default function App() {
             playsInline
             preload="auto"
             onEnded={openInvitation}
+            onError={(e) => console.log("Video error encountered:", e)}
           >
             <source src="/videos/my-video.mp4" type="video/mp4" />
             Your browser does not support the video tag.
           </video>
-
         </div>
       )}
 
