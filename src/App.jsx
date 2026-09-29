@@ -248,10 +248,6 @@ export default function App() {
             Your browser does not support the video tag.
           </video>
 
-          {/* Subtle tap prompt text in case the browser locks autoplay entirely */}
-          <div className="absolute bottom-10 z-50 text-white/50 text-xs font-sans-caps tracking-widest pointer-events-none animate-pulse">
-            Tap anywhere if video doesn't start
-          </div>
         </div>
       )}
 
